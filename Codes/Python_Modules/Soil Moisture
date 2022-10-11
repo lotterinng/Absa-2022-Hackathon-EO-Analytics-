@@ -1,0 +1,153 @@
+/*
+// add on the top label with the date like in multipolygon
+https://developers.google.com/earth-engine/charts_image_histogram
+https://developers.google.com/earth-engine/api_docs#ui.chart.getoptions
+https://developers.google.com/chart/interactive/docs/customizing_axes
+*/
+
+
+//////////////////////////////////////////////////////////////////////
+//change feedback in mobile, size etc
+//////////////////////////////////////////////////////////////////////
+var polygonArealabel = new ui.Label('Draw polygon/s and then set the dates');
+  polygonArealabel.style().set({margin: '1px 0px 2px 10px', fontSize: '16px', fontWeight: 'bold'});
+var polygonAreaPanel = new ui.Panel([polygonArealabel]);
+
+Map.drawingTools().setLinked(false);
+Map.drawingTools().setDrawModes(['polygon']);
+Map.drawingTools().addLayer([]);
+Map.drawingTools().setShape('polygon');
+Map.drawingTools().draw();
+
+var getpolygonArea = ui.util.debounce(function(){
+  
+  var polygons = Map.drawingTools().layers().get(0).toGeometry();
+  var start = startDate.getValue();
+  var start = ee.Date(start);
+  var end = endDate.getValue();
+  var end = ee.Date(end);
+  var images = ee.ImageCollection("COPERNICUS/S2_SR")
+    .filterDate(start,end);
+  var NDVIimages = images.map(function(image) {
+    return image.addBands(image.normalizedDifference(['B8','B4']).rename('ndvi'))});
+  var S2_NDVI= NDVIimages.select('ndvi');
+  
+
+
+  var Chartoptions = {
+  title: 'Crop health time chart of your farm and the defined period',
+  fontSize: 16,
+  margin: '1px',
+  hAxis: {title: 'Time/months'},
+  vAxis: {title: 'Crop health/NDVI'},
+  };
+
+  var NDVIchart = ui.Chart.image.series(S2_NDVI, polygons, ee.Reducer.mean(), 10)
+      .setOptions(Chartoptions);
+  Map.clear();
+  Map.add(credit);
+  Map.add(panel);
+  polygonAreaPanel.clear();
+  polygonAreaPanel.add(headline2).add(NDVIchart).add(arrow);
+  
+  var imageDate = ui.Label();
+  Map.add(imageDate);
+  Map.add(panel2);
+  
+  NDVIchart.onClick(function(xValue, yValue, seriesName) { 
+  if (!xValue) return;  // Selection was made
+  var visNDVI = {min: 0.2, max: 0.8, palette: 'FF0000, FF8000, FFFF00, 00FF00, 00FFFF, 0000FF'};
+  var equalDate = ee.Filter.equals('system:time_start', xValue);
+  var polygons2 = polygons.buffer(1000);
+  var image = ee.Image(S2_NDVI.filter(equalDate).first());
+  var image2 = image.clip(polygons);
+  var ChosenImage = ui.Map.Layer(image2, visNDVI);
+  Map.layers().reset([ChosenImage]);
+  imageDate.setValue((new Date(xValue)).toUTCString());
+  if (!panel2) {Map.add(panel2)}
+  });
+  
+}, 100);
+
+Map.drawingTools().onEdit(getpolygonArea);
+Map.drawingTools().onDraw(getpolygonArea);
+Map.drawingTools().onErase(getpolygonArea);
+
+ 
+Map.setOptions('SATELLITE');
+var visNDVI = {min: 0.2, max: 0.8, palette: 'FF0000, FF8000, FFFF00, 00FF00, 00FFFF, 0000FF'};
+
+
+var startDate = ui.Textbox({value: '2019-01-01',
+                            placeholder: '2019-01-01',
+                            onChange: getpolygonArea,
+                            style: {margin: '1px 0px 1px 10px'}});
+var endDate   = ui.Textbox({value: '2020-12-31',
+                            placeholder: '2020-12-31',
+                            onChange: getpolygonArea,
+                            style: {margin: '1px 0px 1px 10px'}});
+
+var start = startDate.getValue();
+var start = ee.Date(start);
+var end = endDate.getValue();
+var end = ee.Date(end);
+
+var headline = ui.Label('NDVI time chart');
+  headline.style().set({margin: '1px 0px 2px 10px', fontSize: '18px', fontWeight: 'bold'});
+
+var headline2 = ui.Label('Change the polygon or dates for a different chart, ' + 
+                         'click a value in the chart and see that image');
+  headline2.style().set({margin: '1px 0px 2px 10px'});
+  
+var startDateLabel =   ui.Label('Set Start date');
+  startDateLabel.style().set({margin: '1px 0px 1px 10px', fontSize: '14px'});
+
+var endDateLabel =   ui.Label('Set End date');
+  endDateLabel.style().set({margin: '1px 0px 1px 10px', fontSize: '14px'});
+
+var link = ui.Label('Link to the NDVI animation app'); 
+  link.style().set({margin: '1px 0px 2px 10px', fontSize: '16px', fontWeight: 'bold'});
+  link.setUrl('https://harelg25.users.earthengine.app/view/ndvi-animation');
+  
+var arrow =   ui.Label('Click the icon at the top-right of the chart for' + 
+  ' a bigger view and for download as a png or csv file');
+  endDateLabel.style().set({margin: '1px 0px 2px 10px', fontSize: '14px'});
+
+var panel = ui.Panel({
+  widgets: [headline, startDateLabel, startDate,
+            endDateLabel, endDate, link, polygonAreaPanel],
+  layout: ui.Panel.Layout.flow('vertical'),
+  style: {position: 'top-left', width: '350px'}
+});
+
+var scale = ui.Label('Crop Health');
+  scale.style().set({margin: '2px 7px 1px 7px', fontSize: '16px', fontWeight: 'bold'});
+var lon = ee.Image.pixelLonLat().select('longitude');
+var gradient = lon.multiply((visNDVI.max-visNDVI.min)/100.0).add(visNDVI.min);
+var legendImage = gradient.visualize(visNDVI);
+var color = ui.Thumbnail({image: legendImage,
+    params: {bbox:'0,0,100,10', dimensions:'295x15'}, style: {margin: '2px 7px 1px 7px'}}); //t-r-b-l 
+var scaleMinMax = ui.Panel({widgets: [ui.Label('Poor Health'),
+                                      ui.Label('Medium', {textAlign: 'center', stretch: 'horizontal',}),
+                                      ui.Label('Good Health')],
+                            layout: ui.Panel.Layout.flow('horizontal')
+});
+var panel2 = ui.Panel({
+  widgets: [scale, color, scaleMinMax],
+  layout: ui.Panel.Layout.flow('vertical'),
+  style: {padding: '2px', position: 'bottom-center', width: '300px'}
+});
+
+var credit = ui.Label('Created by EO Analytics');
+  credit.style().set({fontSize: '16px', fontWeight: 'bold', /*shown: mobileStyle ? false : true,*/
+                      position: 'bottom-right'});
+  
+var feedback = ui.Label('If you are using this website, please let me know ' +
+                          'your feedback is very important to us  ' );
+  feedback.style().set({fontSize: '26px', fontWeight: 'bold', /*shown: mobileStyle ? false : true,*/ 
+                         position: 'bottom-center', width: '410px'});
+
+
+Map.add(credit);
+Map.add(feedback);
+Map.add(panel);
