@@ -40,5 +40,5 @@
   <div class="toolbar"><h2 class="grow" style="margin:0">Recent activity</h2><a href="{{ url_for('admin.activity') }}">See all</a></div>
   {% include "admin/_activity_table.html" with context %}
 </div>
-<p class="small muted">Satellite source setting: <b>{{ provider }}</b>. Change it with the SATELLITE_PROVIDER environment variable.</p>
+<p class="small muted">Satellite source: real Sentinel-2 Level-2A imagery (ESA Copernicus) via Microsoft Planetary Computer. Weather: Open-Meteo.</p>
 {% endblock %}

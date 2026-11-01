@@ -1,18 +1,18 @@
 """Command-line helpers:
 
     flask --app eo_analytics create-admin you@example.com
-    flask --app eo_analytics seed-demo
+    flask --app eo_analytics seed-sample
 """
 import json
-from datetime import date, timedelta
 
 import click
 
 from .models import Article, Field, User, db
 from .services import geo
 
-# Three fields near Bokaa, Botswana (the study area used in the hackathon notebooks).
-DEMO_FIELDS = [
+# Three real locations near Bokaa, Botswana (the study area used in the hackathon notebooks).
+# Their maps come from real Sentinel-2 imagery of these places.
+SAMPLE_FIELDS = [
     ("North maize block", "Maize", 2.8, [[26.0115, -24.4262], [26.0168, -24.4258], [26.0172, -24.4301], [26.0119, -24.4306]]),
     ("Sorghum strip", "Sorghum", 1.6, [[26.0185, -24.4270], [26.0215, -24.4268], [26.0218, -24.4318], [26.0188, -24.4320]]),
     ("Sweet reed plot", "Sweet reed", 15.0, [[26.0120, -24.4318], [26.0160, -24.4316], [26.0163, -24.4345], [26.0122, -24.4347]]),
@@ -70,11 +70,13 @@ def register_cli(app):
         db.session.commit()
         click.echo(f"{email} is now an administrator.")
 
-    @app.cli.command("seed-demo")
-    def seed_demo():
-        """Add a demo farmer, an admin and starter help articles."""
+    @app.cli.command("seed-sample")
+    def seed_sample():
+        """Add a sample farmer with three fields near Bokaa, an admin and starter help articles.
+
+        The fields are real locations; their maps come from real Sentinel-2 imagery."""
         _seed()
-        click.echo("Demo data ready.  Farmer: farmer@demo.bw / farmer123   Admin: admin@demo.bw / admin1234")
+        click.echo("Sample accounts ready.  Farmer: farmer@demo.bw / farmer123   Admin: admin@demo.bw / admin1234")
 
 
 def _seed():
@@ -89,16 +91,13 @@ def _seed():
         farmer.set_password("farmer123")
         db.session.add(farmer)
         db.session.flush()
-        today = date.today()
-        # Mid-season, so the demo shows a growing crop whatever month it is run in.
-        planting = today - timedelta(days=80)
-        for name, crop, expected, ring in DEMO_FIELDS:
+        for name, crop, expected, ring in SAMPLE_FIELDS:
             geometry = {"type": "Polygon", "coordinates": [ring + [ring[0]]]}
             lat, lon = geo.centroid(geometry)
             db.session.add(Field(
                 user_id=farmer.id, name=name, crop=crop, geometry=json.dumps(geometry),
                 area_ha=geo.area_hectares(geometry), centroid_lat=lat, centroid_lon=lon,
-                expected_yield_t_ha=expected, planting_date=planting,
+                expected_yield_t_ha=expected,
             ))
     if Article.query.count() == 0:
         for category, title, summary, body in HELP_ARTICLES:

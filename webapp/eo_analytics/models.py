@@ -86,7 +86,7 @@ class Reading(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     field_id = db.Column(db.Integer, db.ForeignKey("field.id"), nullable=False, index=True)
     date = db.Column(db.Date, nullable=False)
-    source = db.Column(db.String(30), nullable=False)  # "sentinel-2" or "demo"
+    source = db.Column(db.String(30), nullable=False)  # always "sentinel-2"
     scene_id = db.Column(db.String(120))
     ndvi_mean = db.Column(db.Float)
     ndmi_mean = db.Column(db.Float)

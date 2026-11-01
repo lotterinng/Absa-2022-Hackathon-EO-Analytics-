@@ -29,8 +29,7 @@ def dashboard():
     }
     recent = Activity.query.order_by(Activity.created_at.desc()).limit(12).all()
     return render_template("admin/dashboard.html", users=users, field_counts=field_counts, area=area,
-                           stats=stats, recent=recent, q=q,
-                           provider=current_app.extensions["satellite"].config.get("SATELLITE_PROVIDER"))
+                           stats=stats, recent=recent, q=q)
 
 
 @bp.post("/users/<int:user_id>/block")

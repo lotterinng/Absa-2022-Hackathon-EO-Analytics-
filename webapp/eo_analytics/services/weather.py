@@ -6,11 +6,9 @@ Open-Meteo gives the current conditions, a 7-day forecast and the past 3 months
 """
 from __future__ import annotations
 
-import hashlib
 import logging
-import math
 import time
-from datetime import date, datetime, timedelta
+from datetime import date
 
 log = logging.getLogger(__name__)
 
@@ -87,68 +85,32 @@ def _openmeteo(lat, lon, timeout):
     return current, days
 
 
-def _demo(lat, lon, today=None):
-    """Plausible Botswana-style weather: hot wet summers, cool dry winters."""
-    today = today or date.today()
-    seed = int(hashlib.md5(f"{lat:.2f},{lon:.2f}".encode()).hexdigest()[:6], 16)
-    days = []
-    soil = 0.12
-    for offset in range(-92, 8):
-        d = today + timedelta(days=offset)
-        doy = d.timetuple().tm_yday
-        summer = math.cos((doy - 15) / 365 * 2 * math.pi)  # 1 in mid-January, -1 in mid-July
-        h = int(hashlib.md5(f"{seed}{d}".encode()).hexdigest()[:6], 16) / 0xFFFFFF
-        wet_season = summer > 0.2
-        rain = round((h * 28) if wet_season and h > 0.62 else (h * 4 if h > 0.93 else 0.0), 1)
-        tmax = round(27 + 6 * summer + (h - 0.5) * 4 - rain * 0.15, 1)
-        tmin = round(12 + 8 * summer + (h - 0.5) * 3, 1)
-        et0 = round(4 + 2.5 * summer, 1)
-        soil = min(0.38, max(0.07, soil + rain * 0.006 - et0 * 0.0025))
-        code = 95 if rain > 18 else 63 if rain > 6 else 61 if rain > 0 else 2 if h > 0.5 else 0
-        days.append(
-            {
-                "date": d.isoformat(), "code": code, "tmax": tmax, "tmin": tmin, "rain_mm": rain,
-                "rain_chance": int(min(95, rain * 6 + (40 if wet_season else 5))) if offset >= 0 else None,
-                "et0_mm": et0, "soil_moisture": round(soil, 3),
-            }
-        )
-    t = next(x for x in days if x["date"] == today.isoformat())
-    current = {
-        "time": datetime.now().strftime("%Y-%m-%dT%H:%M"),
-        "temperature": round((t["tmax"] + t["tmin"]) / 2 + 3, 1),
-        "humidity": 35 + int(t["rain_mm"] * 2) % 50,
-        "wind_kmh": round(8 + (seed % 10), 1),
-        "code": t["code"],
-        "rain_mm": t["rain_mm"],
-    }
-    return current, days
+class WeatherUnavailable(RuntimeError):
+    """Open-Meteo could not be reached."""
 
 
-def get_weather(lat, lon, provider="auto", timeout=20):
-    """Return {source, current, past (92 days), forecast (today + 7)}. Cached for 30 minutes."""
-    key = (round(lat, 2), round(lon, 2), provider)
+def get_weather(lat, lon, timeout=20):
+    """Return {source, current, past (92 days), forecast (today + 7)}. Cached for 30 minutes.
+
+    Raises WeatherUnavailable if the service cannot be reached (nothing is simulated).
+    """
+    key = (round(lat, 2), round(lon, 2))
     hit = _cache.get(key)
     if hit and time.time() - hit[0] < 1800:
         return hit[1]
-
-    source = "demo"
-    if provider in ("auto", "openmeteo"):
-        try:
-            current, days = _openmeteo(lat, lon, timeout)
-            source = "open-meteo"
-        except Exception as exc:
-            if provider == "openmeteo":
-                raise
-            log.warning("Open-Meteo not reachable (%s) - using demo weather", exc)
-            current, days = _demo(lat, lon)
-    else:
-        current, days = _demo(lat, lon)
+    try:
+        current, days = _openmeteo(lat, lon, timeout)
+    except Exception as exc:
+        log.warning("Open-Meteo not reachable: %s", exc)
+        raise WeatherUnavailable(
+            "Cannot reach the weather service right now. Please try again in a few minutes."
+        ) from exc
 
     today = date.today().isoformat()
     for item in [current] + days:
         item["description"], item["icon"] = describe(item.get("code"))
     result = {
-        "source": source,
+        "source": "open-meteo",
         "current": current,
         "past": [d for d in days if d["date"] < today],
         "forecast": [d for d in days if d["date"] >= today][:8],

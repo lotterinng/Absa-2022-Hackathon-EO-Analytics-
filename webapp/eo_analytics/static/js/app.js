@@ -55,11 +55,7 @@ const EO = (() => {
   function sourceNote(el, source, kind = 'satellite') {
     if (!el) return;
     el.classList.remove('hidden', 'real');
-    if (source === 'demo') {
-      el.innerHTML = kind === 'satellite'
-        ? '<b>Demo data.</b>&nbsp;The satellite service could not be reached, so these maps are simulated. Real Sentinel-2 images appear automatically when the server is online.'
-        : '<b>Demo weather.</b>&nbsp;The weather service could not be reached, so these numbers are simulated.';
-    } else if (source) {
+    if (source) {
       el.classList.add('real');
       el.innerHTML = kind === 'satellite'
         ? 'Real Sentinel-2 satellite imagery (ESA Copernicus, via Microsoft Planetary Computer). Cloudy pixels are removed.'

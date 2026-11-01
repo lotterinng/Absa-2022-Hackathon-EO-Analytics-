@@ -1,27 +1,47 @@
 """End-to-end tests of the main use cases (run with:  pytest)."""
 import json
+from datetime import date, timedelta
 
 import pytest
 
+from eo_analytics import api as api_module
 from eo_analytics import create_app
 from eo_analytics.models import Activity, Field, Reading, User, db
 from eo_analytics.services import geo, insights
+from eo_analytics.services.satellite import SatelliteUnavailable
+from eo_analytics.services.weather import WeatherUnavailable
+
+from .fake_satellite import FakeProvider
 
 SQUARE = {"type": "Polygon", "coordinates": [[[26.0115, -24.4262], [26.0168, -24.4258],
                                               [26.0172, -24.4301], [26.0119, -24.4306], [26.0115, -24.4262]]]}
 
 
+def fake_weather(lat, lon, timeout=20):
+    today = date.today()
+    days = [{"date": (today + timedelta(days=i)).isoformat(), "code": 61, "tmax": 30, "tmin": 15,
+             "rain_mm": 2.0, "rain_chance": 40, "et0_mm": 5, "soil_moisture": 0.2,
+             "description": "Light rain", "icon": "rain"} for i in range(-92, 8)]
+    return {"source": "open-meteo",
+            "current": {"time": today.isoformat() + "T12:00", "temperature": 25, "humidity": 40,
+                        "wind_kmh": 10, "code": 0, "rain_mm": 0, "description": "Clear sky", "icon": "sun"},
+            "past": [d for d in days if d["date"] < today.isoformat()],
+            "forecast": [d for d in days if d["date"] >= today.isoformat()]}
+
+
 @pytest.fixture()
-def app(tmp_path):
+def app(tmp_path, monkeypatch):
+    """The app with the satellite and weather services replaced by offline stand-ins,
+    so the tests run without internet. The real app never uses these."""
     app = create_app({
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'test.db'}",
-        "SATELLITE_PROVIDER": "demo",
-        "WEATHER_PROVIDER": "demo",
         "NEWS_FEEDS": [],
         "CACHE_DIR": tmp_path / "cache",
         "ADMIN_EMAIL": "boss@example.com",
     })
+    app.extensions["satellite"].provider = FakeProvider()
+    monkeypatch.setattr(api_module, "get_weather", fake_weather)
     yield app
 
 
@@ -92,7 +112,7 @@ def test_satellite_analysis_and_cache(client, app):
         r = client.get(f"/api/fields/{fid}/analysis?index={index}")
         assert r.status_code == 200, r.json
         d = r.json
-        assert d["source"] == "demo" and d["reading"][index] is not None
+        assert d["source"] == "sentinel-2" and d["reading"][index] is not None
         assert d["overlay"]["image"].startswith("data:image/png;base64,")
         assert sum(d["reading"][index + "_classes"].values()) == pytest.approx(100, abs=0.5)
         assert d["recommendation"]
@@ -176,3 +196,77 @@ def test_yield_estimate_rules():
     assert est["status"] == "ok" and est["current_pct"] >= 90
     bare = [{"date": (today - timedelta(days=d)).isoformat(), "ndvi": 0.18} for d in (30, 20, 10)]
     assert insights.yield_estimate(F, bare, today)["status"] == "no-crop"
+
+
+def test_satellite_outage_shows_error_not_fake_data(client, app):
+    class Down:
+        name = "sentinel-2"
+
+        def list_scenes(self, *a):
+            raise SatelliteUnavailable("Cannot reach the Sentinel-2 satellite service right now.")
+
+    register(client); login(client)
+    fid = client.post("/api/fields", json={"name": "A", "crop": "Maize", "geometry": SQUARE}).json["id"]
+    app.extensions["satellite"].provider = Down()
+    r = client.get(f"/api/fields/{fid}/analysis")
+    assert r.status_code == 503 and "satellite" in r.json["error"]
+    assert client.get(f"/api/fields/{fid}/timeseries").status_code == 503
+    with app.app_context():
+        assert Reading.query.count() == 0
+
+
+def test_weather_outage_shows_error(client, monkeypatch):
+    def down(*a, **k):
+        raise WeatherUnavailable("Cannot reach the weather service right now.")
+
+    monkeypatch.setattr(api_module, "get_weather", down)
+    register(client); login(client)
+    r = client.get("/api/weather")
+    assert r.status_code == 503 and "weather" in r.json["error"]
+
+
+def test_real_provider_reads_sentinel2_files(tmp_path):
+    """Run the real Planetary Computer code on small local GeoTIFFs laid out exactly like
+    Sentinel-2 L2A (UTM, 10 m and 20 m bands, +1000 offset). Two tiles cover the same day:
+    the first has no data over the field, so the provider must use the second."""
+    rasterio = pytest.importorskip("rasterio")
+    import numpy as np
+    from types import SimpleNamespace as NS
+
+    from rasterio.transform import from_origin
+    from rasterio.warp import transform_bounds
+
+    from eo_analytics.services.satellite import PlanetaryComputerProvider, Scene
+
+    crs = "EPSG:32735"
+    b = transform_bounds("EPSG:4326", crs, 25.99, -24.45, 26.04, -24.41)
+    x0, y1 = b[0] // 20 * 20, (b[3] // 20 + 1) * 20
+    w10, h10 = int((b[2] - x0) // 10) + 2, int((y1 - b[1]) // 10) + 2
+    xx = np.mgrid[0:h10, 0:w10][1]
+
+    def tile(name, scl_value):
+        folder = tmp_path / name
+        folder.mkdir()
+
+        def write(band, arr, res):
+            with rasterio.open(folder / f"{band}.tif", "w", driver="GTiff", width=arr.shape[1],
+                               height=arr.shape[0], count=1, dtype="uint16", crs=crs,
+                               transform=from_origin(x0, y1, res, res)) as dst:
+                dst.write(arr, 1)
+
+        write("B04", np.full((h10, w10), 500 + 1000, np.uint16), 10)
+        write("B08", (np.where(xx < w10 // 2, 4000, 2000) + 1000).astype(np.uint16), 10)
+        write("B11", np.full((h10 // 2, w10 // 2), 2000 + 1000, np.uint16), 20)
+        write("SCL", np.full((h10 // 2, w10 // 2), scl_value, np.uint16), 20)
+        return NS(id=name, properties={"s2:processing_baseline": "05.10", "eo:cloud_cover": 1},
+                  assets={k: NS(href=str(folder / f"{k}.tif")) for k in ("B04", "B08", "B11", "SCL")})
+
+    empty, good = tile("EMPTY_TILE", 0), tile("GOOD_TILE", 4)  # SCL 0 = no data, 4 = vegetation
+    scene = Scene(id="x", date=date.today(), cloud_cover=1, payload=[empty, good])
+    arrays = PlanetaryComputerProvider().compute(SQUARE, scene)
+    assert scene.id == "GOOD_TILE" and arrays.clear_fraction > 0.99
+    ndvi = arrays.ndvi[np.isfinite(arrays.ndvi)]
+    assert ndvi.max() == pytest.approx((0.40 - 0.05) / 0.45, abs=0.005)  # offset removed correctly
+    assert ndvi.min() == pytest.approx((0.20 - 0.05) / 0.25, abs=0.005)
+    ndmi = arrays.ndmi[np.isfinite(arrays.ndmi)]
+    assert ndmi.max() == pytest.approx((0.40 - 0.20) / 0.60, abs=0.005)

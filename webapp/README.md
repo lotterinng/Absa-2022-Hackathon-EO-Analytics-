@@ -17,10 +17,16 @@ The working web app for the **EO Analytics – Space-Tech Farming** design
 | Agric News | Admin-written articles by category + public RSS feeds | Database + RSS |
 | Admin | View/search users, block, delete, make admin, activity log, write news | Database |
 
-**No API keys are needed.** Satellite images come free from the European
-Sentinel-2 satellites through Microsoft Planetary Computer, and weather from
-Open-Meteo. If the server has no internet, the app switches to realistic
-*demo data* and shows a yellow "Demo data" note, so it always runs.
+**All data is real and no API keys are needed.** Satellite images come free from
+the European Sentinel-2 satellites through Microsoft Planetary Computer, and
+weather from Open-Meteo. Nothing is simulated: if one of these services can't be
+reached, the page says so and offers a "Try again" button.
+
+The server therefore needs internet access to these addresses:
+
+* `planetarycomputer.microsoft.com` (satellite catalogue and access tokens)
+* `*.blob.core.windows.net` (the Sentinel-2 image files)
+* `api.open-meteo.com` (weather)
 
 ---
 
@@ -36,13 +42,13 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r requirements.txt
-flask --app wsgi seed-demo        # optional: demo farmer, admin, 3 fields, help articles
+flask --app wsgi seed-sample        # optional: sample farmer with 3 real fields near Bokaa, admin, help articles
 python wsgi.py
 ```
 
 Open <http://localhost:5000>.
 
-Demo logins (after `seed-demo`):
+Sample logins (after `seed-sample`):
 
 * Farmer: `farmer@demo.bw` / `farmer123`
 * Admin:  `admin@demo.bw` / `admin1234`
@@ -53,9 +59,9 @@ Create your own administrator:
 flask --app wsgi create-admin you@example.com --name "Your Name"
 ```
 
-> **Windows tip:** if `pip install rasterio` fails, install the rest first
-> (`pip install Flask Flask-SQLAlchemy requests numpy Pillow`). The app will
-> run on demo satellite data until rasterio is installed.
+> **Windows tip:** recent versions of `rasterio` install directly with pip. If it
+> fails on an older Python, upgrade to Python 3.11 or newer, or use the Docker
+> image below. The satellite pages need rasterio to work.
 
 ## 2. Run the tests
 
@@ -63,6 +69,11 @@ flask --app wsgi create-admin you@example.com --name "Your Name"
 pip install -r requirements-dev.txt
 pytest
 ```
+
+The tests run offline: they swap in a stand-in satellite provider
+(`tests/fake_satellite.py`) and stand-in weather. One test runs the real
+Sentinel-2 reading code on small local image files laid out exactly like
+Sentinel-2. The app itself never uses the stand-ins.
 
 ## 3. Put it online
 
@@ -85,9 +96,7 @@ persistent storage (or set `DATABASE_URL` to a PostgreSQL database; install
 |---|---|---|
 | `SECRET_KEY` | dev value | **Change in production.** Signs login cookies. |
 | `DATABASE_URL` | SQLite in `instance/` | Any SQLAlchemy URL, e.g. PostgreSQL |
-| `SATELLITE_PROVIDER` | `auto` | `planetary` (real only), `demo`, or `auto` (real, demo if offline) |
-| `WEATHER_PROVIDER` | `auto` | `openmeteo`, `demo`, or `auto` |
-| `MAX_CLOUD_COVER` | `40` | Skip Sentinel-2 scenes cloudier than this (%) |
+| `MAX_CLOUD_COVER` | `60` | Skip Sentinel-2 tiles cloudier than this (%). Cloud is also removed pixel by pixel. |
 | `MIN_CLEAR_FRACTION` | `0.6` | Share of the field that must be cloud-free to use a scene |
 | `ADMIN_EMAIL` | – | First account registered with this email becomes admin |
 | `NEWS_FEEDS` | FAO + agriculture.com | Comma-separated RSS feeds for Agric News |
@@ -108,9 +117,9 @@ webapp/
 │   ├── views.py             page routes
 │   ├── api.py               JSON used by the pages (fields, analysis, timeseries, yield, weather)
 │   ├── admin.py             admin screens
-│   ├── cli.py               create-admin, seed-demo
+│   ├── cli.py               create-admin, seed-sample
 │   ├── services/
-│   │   ├── satellite.py     Sentinel-2 NDVI/NDMI (Planetary Computer) + demo provider, caching, map images
+│   │   ├── satellite.py     Sentinel-2 NDVI/NDMI (Planetary Computer), caching, map images
 │   │   ├── weather.py       Open-Meteo weather + modelled soil moisture
 │   │   ├── insights.py      recommendations, statistics text, yield estimate
 │   │   ├── news.py          RSS reader
@@ -121,8 +130,9 @@ webapp/
 ```
 
 **Satellite pipeline.** For each field the server searches the Sentinel-2
-Level-2A catalogue for passes in the last 3–6 months with less than 40% cloud,
-reads only the small window covering the field (bands B04 red, B08 near-infrared,
+Level-2A catalogue for passes in the last 3–6 months with less than 60% cloud,
+reads only the small window covering the field (trying each overlapping tile
+when a field sits on a tile edge) (bands B04 red, B08 near-infrared,
 B11 short-wave infrared and the SCL cloud mask), removes cloud and shadow
 pixels, and computes:
 

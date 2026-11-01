@@ -9,7 +9,7 @@ from .auth import login_required
 from .models import Field, Reading, db, log_activity
 from .services import geo, insights
 from .services.satellite import INDEX_INFO, SatelliteUnavailable, parse_date, season_window
-from .services.weather import get_weather
+from .services.weather import WeatherUnavailable, get_weather
 
 bp = Blueprint("api", __name__)
 log = logging.getLogger(__name__)
@@ -152,8 +152,7 @@ def analysis(field_id):
     else:
         weather = None
         try:
-            weather = get_weather(field.centroid_lat, field.centroid_lon,
-                                  current_app.config["WEATHER_PROVIDER"], current_app.config["HTTP_TIMEOUT"])
+            weather = get_weather(field.centroid_lat, field.centroid_lon, current_app.config["HTTP_TIMEOUT"])
         except Exception:
             pass
         rec = insights.moisture_recommendation(reading, weather)
@@ -183,8 +182,7 @@ def timeseries(field_id):
         return _err(str(exc), 503)
     weather = None
     try:
-        weather = get_weather(field.centroid_lat, field.centroid_lon,
-                              current_app.config["WEATHER_PROVIDER"], current_app.config["HTTP_TIMEOUT"])
+        weather = get_weather(field.centroid_lat, field.centroid_lon, current_app.config["HTTP_TIMEOUT"])
     except Exception as exc:
         log.info("weather unavailable: %s", exc)
     usable = [r for r in readings if r["ndvi"] is not None]
@@ -234,7 +232,7 @@ def weather():
     else:
         lat, lon, place = -24.6282, 25.9231, "Gaborone"
     try:
-        data = get_weather(lat, lon, current_app.config["WEATHER_PROVIDER"], current_app.config["HTTP_TIMEOUT"])
-    except Exception as exc:
-        return _err(f"Weather service unavailable: {exc}", 503)
+        data = get_weather(lat, lon, current_app.config["HTTP_TIMEOUT"])
+    except WeatherUnavailable as exc:
+        return _err(str(exc), 503)
     return jsonify({**data, "place": place, "lat": lat, "lon": lon})
