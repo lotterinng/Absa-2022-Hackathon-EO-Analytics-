@@ -1,0 +1,16 @@
+{% extends "auth/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Reset password{% endblock %}
+{% block form %}
+{% if reset_link %}
+<div class="flash info">Email is not set up on this server, so here is your reset link (valid 1 hour):<br>
+<a class="reset-link" href="{{ reset_link }}">{{ reset_link }}</a></div>
+{% endif %}
+<p class="muted" style="text-align:center">Enter the email you registered with and we'll send you a link to choose a new password.</p>
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="input-icon">{{ icon('mail') }}<input type="email" name="email" placeholder="Email" aria-label="Email" required></div>
+  <button class="btn dark block">Send reset link</button>
+</form>
+<div class="links"><p><a href="{{ url_for('auth.login') }}">Back to sign in</a></p></div>
+{% endblock %}

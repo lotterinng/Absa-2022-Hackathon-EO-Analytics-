@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block title %}{{ code }}{% endblock %}
+{% block auth %}<div class="auth"><div class="auth-box" style="text-align:center"><h1>{{ code }}</h1><p>{{ message }}</p><a class="btn" href="/">Go home</a></div></div>{% endblock %}
+{% block content %}<div class="card empty"><h2>{{ code }}</h2><p>{{ message }}</p><a class="btn" href="/">Go home</a></div>{% endblock %}

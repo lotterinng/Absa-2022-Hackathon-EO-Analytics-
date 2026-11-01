@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Agric News{% endblock %}
+{% block content %}
+<article class="card article">
+  <p><a href="{{ url_for('views.news') }}">← All news</a></p>
+  <span class="badge blue">{{ article.category }}</span>
+  <h1 style="margin-top:10px">{{ article.title }}</h1>
+  <p class="muted small">{{ article.created_at.strftime('%d %B %Y') }} · {{ article.read_minutes }} min read</p>
+  {% if article.image_url %}<img src="{{ article.image_url }}" alt="" style="width:100%;border-radius:14px;margin-bottom:16px">{% endif %}
+  <div class="content">{% for para in article.body.split('\n') if para.strip() %}<p>{{ para }}</p>{% endfor %}</div>
+  {% if article.link %}<p><a href="{{ article.link }}" target="_blank" rel="noopener">Read the original source →</a></p>{% endif %}
+</article>
+{% endblock %}

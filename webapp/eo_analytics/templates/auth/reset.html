@@ -1,0 +1,11 @@
+{% extends "auth/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Choose a new password{% endblock %}
+{% block form %}
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="input-icon">{{ icon('key') }}<input type="password" name="password" placeholder="New password" aria-label="New password" minlength="8" required></div>
+  <div class="input-icon" style="margin-top:14px">{{ icon('key') }}<input type="password" name="confirm" placeholder="Confirm new password" aria-label="Confirm new password" minlength="8" required></div>
+  <button class="btn dark block">Change password</button>
+</form>
+{% endblock %}

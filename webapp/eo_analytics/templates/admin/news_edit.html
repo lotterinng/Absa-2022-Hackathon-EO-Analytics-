@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if item.id else 'New' }} article{% endblock %}
+{% block content %}
+{% include "admin/_tabs.html" %}
+<div class="card" style="max-width:760px">
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label>Title</label><input name="title" value="{{ item.title or '' }}" required>
+    <label>Category</label><select name="category">{% for c in categories %}<option {{ 'selected' if c == item.category }}>{{ c }}</option>{% endfor %}</select>
+    <label>Short summary</label><input name="summary" maxlength="400" value="{{ item.summary or '' }}">
+    <label>Article text <span class="muted">(blank line between paragraphs)</span></label><textarea name="body" rows="12" required>{{ item.body or '' }}</textarea>
+    <label>Image URL <span class="muted">(optional)</span></label><input name="image_url" type="url" value="{{ item.image_url or '' }}">
+    <label>Source link <span class="muted">(optional)</span></label><input name="link" type="url" value="{{ item.link or '' }}">
+    <label class="check"><input type="checkbox" name="published" {{ 'checked' if item.published is none or item.published }}> Published</label>
+    <p><button class="btn green">Save article</button> <a class="btn ghost" href="{{ url_for('admin.news_list') }}">Cancel</a></p>
+  </form>
+</div>
+{% endblock %}

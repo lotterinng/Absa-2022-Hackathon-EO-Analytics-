@@ -1,0 +1,5 @@
+<nav class="tabs" style="margin-top:0">
+  <a href="{{ url_for('admin.dashboard') }}" class="{{ 'on' if request.endpoint in ('admin.dashboard', 'admin.user_detail') }}">Users</a>
+  <a href="{{ url_for('admin.activity') }}" class="{{ 'on' if request.endpoint == 'admin.activity' }}">Activity log</a>
+  <a href="{{ url_for('admin.news_list') }}" class="{{ 'on' if request.endpoint in ('admin.news_list', 'admin.news_edit') }}">Agric News</a>
+</nav>

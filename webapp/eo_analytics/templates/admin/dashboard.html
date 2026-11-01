@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Administration{% endblock %}
+{% block content %}
+{% include "admin/_tabs.html" %}
+<div class="stat-tiles">
+  <div class="stat"><b>{{ stats.users }}</b><span>Registered users</span></div>
+  <div class="stat"><b>{{ stats.blocked }}</b><span>Blocked</span></div>
+  <div class="stat"><b>{{ stats.fields }}</b><span>Fields monitored</span></div>
+  <div class="stat"><b>{{ stats.hectares }}</b><span>Hectares</span></div>
+  <div class="stat"><b>{{ stats.readings }}</b><span>Satellite readings</span></div>
+</div>
+<div class="card">
+  <div class="toolbar">
+    <h2 class="grow" style="margin:0">Users</h2>
+    <form method="get" class="search" style="min-width:240px"><input name="q" value="{{ q }}" placeholder="Search name or email" aria-label="Search users"></form>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Name</th><th>Email</th><th>Fields</th><th>Joined</th><th>Last login</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+    <tr>
+      <td><a href="{{ url_for('admin.user_detail', user_id=u.id) }}"><b>{{ u.full_name }}</b></a>{% if u.is_admin %} <span class="badge blue">admin</span>{% endif %}</td>
+      <td>{{ u.email }}</td>
+      <td>{{ field_counts.get(u.id, 0) }} <span class="muted small">({{ '%.1f'|format(area.get(u.id) or 0) }} ha)</span></td>
+      <td>{{ u.created_at.strftime('%d %b %Y') }}</td>
+      <td>{{ u.last_login.strftime('%d %b %Y %H:%M') if u.last_login else '–' }}</td>
+      <td>{% if u.is_blocked %}<span class="badge red">blocked</span>{% else %}<span class="badge green">active</span>{% endif %}</td>
+      <td style="white-space:nowrap">
+        {% if u.id != g.user.id %}
+        <form method="post" action="{{ url_for('admin.toggle_block', user_id=u.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn ghost sm">{{ 'Unblock' if u.is_blocked else 'Block' }}</button></form>
+        <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" onsubmit="return confirm('Delete {{ u.email }} and all their fields? This cannot be undone.')"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn danger sm">Delete</button></form>
+        {% else %}<span class="muted small">you</span>{% endif %}
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="empty">No users found.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+<div class="card">
+  <div class="toolbar"><h2 class="grow" style="margin:0">Recent activity</h2><a href="{{ url_for('admin.activity') }}">See all</a></div>
+  {% include "admin/_activity_table.html" with context %}
+</div>
+<p class="small muted">Satellite source setting: <b>{{ provider }}</b>. Change it with the SATELLITE_PROVIDER environment variable.</p>
+{% endblock %}

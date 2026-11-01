@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}User{% endblock %}
+{% block content %}
+{% include "admin/_tabs.html" %}
+<div class="grid grid-2">
+  <div class="card">
+    <h2>{{ u.full_name }} {% if u.is_admin %}<span class="badge blue">admin</span>{% endif %} {% if u.is_blocked %}<span class="badge red">blocked</span>{% endif %}</h2>
+    <div class="kv"><span class="muted">Email</span><span>{{ u.email }}</span></div>
+    <div class="kv"><span class="muted">Phone</span><span>{{ u.phone or '–' }}</span></div>
+    <div class="kv"><span class="muted">Joined</span><span>{{ u.created_at.strftime('%d %b %Y') }}</span></div>
+    <div class="kv"><span class="muted">Last login</span><span>{{ u.last_login.strftime('%d %b %Y %H:%M') if u.last_login else '–' }}</span></div>
+    {% if u.id != g.user.id %}
+    <div class="toolbar" style="margin-top:14px">
+      <form method="post" action="{{ url_for('admin.toggle_block', user_id=u.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn ghost sm">{{ 'Unblock' if u.is_blocked else 'Block' }}</button></form>
+      <form method="post" action="{{ url_for('admin.toggle_admin', user_id=u.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn ghost sm">{{ 'Remove admin' if u.is_admin else 'Make admin' }}</button></form>
+      <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" onsubmit="return confirm('Delete this account and all its fields?')"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn danger sm">Delete</button></form>
+    </div>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h2>Fields</h2>
+    {% for f in u.fields %}
+    <div class="kv"><span><b>{{ f.name }}</b> · {{ f.crop }}</span><span>{{ '%.1f'|format(f.area_ha) }} ha · {{ '%.4f'|format(f.centroid_lat) }}, {{ '%.4f'|format(f.centroid_lon) }}</span></div>
+    {% else %}<p class="muted">No fields.</p>{% endfor %}
+  </div>
+</div>
+<div class="card"><h2>Activity</h2>{% set rows = activity %}{% include "admin/_activity_table.html" with context %}</div>
+{% endblock %}

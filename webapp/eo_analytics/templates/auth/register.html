@@ -1,0 +1,15 @@
+{% extends "auth/_layout.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Sign up{% endblock %}
+{% block form %}
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="input-icon">{{ icon('user') }}<input name="full_name" placeholder="Full name" aria-label="Full name" required value="{{ form.full_name }}"></div>
+  <div class="input-icon" style="margin-top:14px">{{ icon('mail') }}<input type="email" name="email" placeholder="Email" aria-label="Email" required value="{{ form.email }}"></div>
+  <div class="input-icon" style="margin-top:14px">{{ icon('phone') }}<input name="phone" placeholder="Phone (optional)" aria-label="Phone" value="{{ form.phone }}"></div>
+  <div class="input-icon" style="margin-top:14px">{{ icon('key') }}<input type="password" name="password" placeholder="Password (8+ characters)" aria-label="Password" minlength="8" required></div>
+  <div class="input-icon" style="margin-top:14px">{{ icon('key') }}<input type="password" name="confirm" placeholder="Confirm password" aria-label="Confirm password" minlength="8" required></div>
+  <button class="btn dark block">SignUp</button>
+</form>
+<div class="links"><p>Already have an account? <a href="{{ url_for('auth.login') }}"><b>SignIn</b></a></p></div>
+{% endblock %}

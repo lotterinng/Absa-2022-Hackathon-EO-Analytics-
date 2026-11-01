@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Activity log{% endblock %}
+{% block content %}
+{% include "admin/_tabs.html" %}
+<div class="card">{% include "admin/_activity_table.html" with context %}</div>
+{% endblock %}
