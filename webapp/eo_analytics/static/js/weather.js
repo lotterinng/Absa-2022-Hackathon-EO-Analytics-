@@ -18,7 +18,7 @@
     $('desc').textContent = 'Loading…';
     try {
       const w = await EO.api('/api/weather' + (fieldId ? `?field=${fieldId}` : ''));
-      EO.sourceNote($('source'), w.source === 'demo' ? 'demo' : 'live', 'weather');
+      EO.sourceNote($('source'), w.source, 'weather');
       const c = w.current, today = w.forecast[0] || {};
       $('place').innerHTML = EO.escape(w.place);
       $('desc').textContent = `${EO.fmtDate(c.time.slice(0, 10), { weekday: 'long', day: 'numeric', month: 'long' })} · ${w.lat.toFixed(3)}, ${w.lon.toFixed(3)}`;

@@ -26,15 +26,12 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # "planetary" = real Sentinel-2 imagery from Microsoft Planetary Computer (free, no key).
-    # "demo"      = realistic simulated data, works with no internet connection.
-    # "auto"      = try real data first, fall back to demo if it cannot be reached.
-    SATELLITE_PROVIDER = os.environ.get("SATELLITE_PROVIDER", "auto")
-    # "openmeteo" (free, no key), "demo", or "auto".
-    WEATHER_PROVIDER = os.environ.get("WEATHER_PROVIDER", "auto")
+    # Satellite imagery is always real Sentinel-2 (Microsoft Planetary Computer) and
+    # weather is always real (Open-Meteo). Neither needs an API key.
 
-    # Max cloud cover (%) of a Sentinel-2 scene before it is skipped.
-    MAX_CLOUD_COVER = int(os.environ.get("MAX_CLOUD_COVER", "40"))
+    # Skip Sentinel-2 tiles cloudier than this (%). Cloud is also removed pixel by pixel,
+    # so a fairly cloudy tile can still give a clear view of a small field.
+    MAX_CLOUD_COVER = int(os.environ.get("MAX_CLOUD_COVER", "60"))
     # Share of the field that must be cloud-free in a scene for it to count.
     MIN_CLEAR_FRACTION = float(os.environ.get("MIN_CLEAR_FRACTION", "0.6"))
     # Largest field accepted, in hectares (keeps satellite downloads small).

@@ -1,13 +1,10 @@
 """Satellite crop-health (NDVI) and moisture (NDMI) analysis.
 
-Two providers share one interface:
-
-* PlanetaryComputerProvider - real Sentinel-2 Level-2A imagery (10 m pixels, a new
-  pass every ~5 days) from Microsoft Planetary Computer. Free, no account needed.
-  This replaces the Google Earth Engine prototype in Codes/Python_Modules, which
-  needed every user to have an Earth Engine login.
-* DemoProvider - realistic simulated imagery that follows a southern-African
-  cropping season. Used when there is no internet, or when SATELLITE_PROVIDER=demo.
+All imagery is real: Sentinel-2 Level-2A (10 m pixels, a new pass every ~5 days)
+from Microsoft Planetary Computer. Free, no account or API key needed. This
+replaces the Google Earth Engine prototype in Codes/Python_Modules, which needed
+every user to have an Earth Engine login. If the service cannot be reached the
+pages show an error; no data is ever simulated.
 
 Indices
   NDVI = (NIR - Red) / (NIR + Red)      -> crop health / greenness   (B08, B04)
@@ -19,12 +16,10 @@ database, so the satellite is only queried once per field per date.
 from __future__ import annotations
 
 import base64
-import hashlib
 import io
 import json
 import logging
 import math
-import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -157,63 +152,6 @@ def colourise(values, index):
 # --------------------------------------------------------------------------- providers
 
 
-class DemoProvider:
-    """Simulated Sentinel-2 passes. Deterministic, so the same field always looks the same."""
-
-    name = "demo"
-    revisit_days = 5
-
-    def list_scenes(self, geometry, start, end):
-        scenes = []
-        anchor = date(2020, 1, 3)
-        d = anchor + timedelta(days=((start - anchor).days // self.revisit_days + 1) * self.revisit_days)
-        while d <= end:
-            seed = int(hashlib.md5(d.isoformat().encode()).hexdigest()[:8], 16)
-            cloud = (seed % 100) * (0.9 if d.month in (5, 6, 7, 8, 9) else 1.0)
-            if cloud < 70:
-                scenes.append(Scene(id=f"DEMO_{d:%Y%m%d}", date=d, cloud_cover=round(cloud * 0.5, 1)))
-            d += timedelta(days=self.revisit_days)
-        return scenes
-
-    @staticmethod
-    def season_ndvi(day, planting=None):
-        """Typical rain-fed crop curve for southern Africa (planting Nov, peak Feb, harvest May)."""
-        if planting is None:
-            planting = date(day.year if day.month >= 10 else day.year - 1, 11, 20)
-        t = (day - planting).days
-        if t < 0 or t > 220:
-            return 0.18  # dry-season bare / stubble field
-        green_up = 1 / (1 + math.exp(-(t - 45) / 9))
-        senesce = 1 / (1 + math.exp((t - 140) / 12))
-        return 0.18 + 0.62 * green_up * senesce
-
-    def compute(self, geometry, scene, crop=None, planting=None, field_key=""):
-        bbox = padded_bbox(geometry)
-        shape = lonlat_grid_shape(bbox, max_px=220)
-        inside = polygon_mask(geometry, bbox, shape)
-        h, w = shape
-        rng = np.random.default_rng(int(hashlib.md5(field_key.encode()).hexdigest()[:8], 16))
-        yy, xx = np.mgrid[0:h, 0:w] / max(h, w)
-        # Smooth within-field pattern (soil differences, a wetter corner, a weak strip).
-        pattern = np.zeros(shape)
-        for _ in range(5):
-            fx, fy, ph = rng.uniform(1, 4), rng.uniform(1, 4), rng.uniform(0, 6.28)
-            pattern += np.sin(fx * 6.28 * xx + ph) * np.cos(fy * 6.28 * yy + ph / 2)
-        pattern /= np.abs(pattern).max() or 1
-        day_noise = np.random.default_rng(scene.date.toordinal() + len(field_key)).normal(0, 0.02, shape)
-        vigour = rng.uniform(0.72, 1.0)  # some fields simply do better than others
-        cx, cy = rng.uniform(0.2, 0.8, 2)  # one stressed patch (e.g. a sandy or waterlogged spot)
-        pattern -= 1.6 * np.exp(-(((xx - cx) ** 2 + (yy - cy) ** 2) / 0.03))
-        base = 0.18 + (self.season_ndvi(scene.date, planting) - 0.18) * vigour
-        amplitude = 0.04 + 0.16 * (base - 0.18) / 0.62
-        ndvi = np.clip(base + amplitude * pattern + day_noise, -0.1, 0.95)
-        rain = 0.06 * math.sin(scene.date.toordinal() / 9.0)  # wet/dry spells
-        ndmi = np.clip(0.75 * ndvi - 0.22 + rain + 0.08 * pattern + day_noise, -0.5, 0.7)
-        ndvi = np.where(inside, ndvi, np.nan).astype(np.float32)
-        ndmi = np.where(inside, ndmi, np.nan).astype(np.float32)
-        return SceneArrays(ndvi=ndvi, ndmi=ndmi, bbox=bbox, clear_fraction=1.0)
-
-
 class PlanetaryComputerProvider:
     """Real Sentinel-2 L2A imagery from Microsoft Planetary Computer (no API key required)."""
 
@@ -221,9 +159,10 @@ class PlanetaryComputerProvider:
     STAC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
     COLLECTION = "sentinel-2-l2a"
 
-    def __init__(self, max_cloud_cover=40, timeout=20):
+    def __init__(self, max_cloud_cover=60, timeout=20, min_clear=0.6):
         self.max_cloud_cover = max_cloud_cover
         self.timeout = timeout
+        self.min_clear = min_clear
 
     def _catalog(self):
         try:
@@ -231,14 +170,19 @@ class PlanetaryComputerProvider:
             import pystac_client
         except ImportError as exc:  # pragma: no cover - depends on install
             raise SatelliteUnavailable(
-                "Install rasterio, pystac-client and planetary-computer for real imagery."
+                "The satellite libraries are not installed on the server. "
+                "Run: pip install rasterio pystac-client planetary-computer"
             ) from exc
         try:
             return pystac_client.Client.open(self.STAC_URL, modifier=planetary_computer.sign_inplace)
         except Exception as exc:
-            raise SatelliteUnavailable(f"Cannot reach Planetary Computer: {exc}") from exc
+            raise SatelliteUnavailable(
+                "Cannot reach the Sentinel-2 satellite service right now. Please try again in a few minutes."
+            ) from exc
 
     def list_scenes(self, geometry, start, end):
+        """One Scene per satellite pass date. A field near a tile edge can be covered by
+        several tiles on the same day, so every tile is kept (clearest first)."""
         catalog = self._catalog()
         try:
             search = catalog.search(
@@ -246,29 +190,55 @@ class PlanetaryComputerProvider:
                 intersects=geo.normalise_polygon(geometry),
                 datetime=f"{start.isoformat()}/{end.isoformat()}",
                 query={"eo:cloud_cover": {"lt": self.max_cloud_cover}},
-                max_items=80,
+                max_items=200,
             )
             items = list(search.items())
         except Exception as exc:
-            raise SatelliteUnavailable(f"Satellite search failed: {exc}") from exc
+            log.warning("Sentinel-2 search failed: %s", exc)
+            raise SatelliteUnavailable(
+                "Cannot reach the Sentinel-2 satellite service right now. Please try again in a few minutes."
+            ) from exc
         by_day = {}
         for item in items:
-            d = item.datetime.date()
-            cc = float(item.properties.get("eo:cloud_cover", 100))
-            if d not in by_day or cc < by_day[d].cloud_cover:
-                by_day[d] = Scene(id=item.id, date=d, cloud_cover=cc, payload=item)
-        return sorted(by_day.values(), key=lambda s: s.date)
+            by_day.setdefault(item.datetime.date(), []).append(item)
+        scenes = []
+        for d, day_items in by_day.items():
+            day_items.sort(key=lambda it: float(it.properties.get("eo:cloud_cover", 100)))
+            scenes.append(Scene(
+                id=day_items[0].id, date=d,
+                cloud_cover=float(day_items[0].properties.get("eo:cloud_cover", 100)),
+                payload=day_items,
+            ))
+        return sorted(scenes, key=lambda s: s.date)
 
     def compute(self, geometry, scene, **_):
+        """Field arrays for one pass date: tries each tile of that day until one sees the field clearly."""
+        items = scene.payload if isinstance(scene.payload, list) else [scene.payload]
+        if not items or items[0] is None:
+            raise SatelliteUnavailable("Scene metadata missing; list scenes first.")
+        best, last_error = None, None
+        for item in items:
+            try:
+                arrays = self._compute_item(geometry, item)
+            except SatelliteUnavailable as exc:
+                last_error = exc
+                continue
+            if best is None or arrays.clear_fraction > best.clear_fraction:
+                best = arrays
+                scene.id = item.id
+            if best.clear_fraction >= self.min_clear:
+                break
+        if best is None:
+            raise last_error or SatelliteUnavailable(f"No readable tile for {scene.date}")
+        return best
+
+    def _compute_item(self, geometry, item):
         import rasterio
         from rasterio.enums import Resampling
         from rasterio.transform import from_bounds
         from rasterio.warp import reproject, transform_bounds
         from rasterio.windows import from_bounds as window_from_bounds
 
-        item = scene.payload
-        if item is None:
-            raise SatelliteUnavailable("Scene metadata missing; list scenes first.")
         bbox = padded_bbox(geometry)
         out_shape = lonlat_grid_shape(bbox)
 
@@ -281,6 +251,7 @@ class PlanetaryComputerProvider:
             CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif,.TIF,.tiff",
             GDAL_HTTP_TIMEOUT=str(self.timeout),
             GDAL_HTTP_MAX_RETRY="3",
+            GDAL_HTTP_RETRY_DELAY="2",
         )
         bands = {}
         try:
@@ -303,7 +274,8 @@ class PlanetaryComputerProvider:
                             resampling=Resampling.nearest if key == "SCL" else Resampling.bilinear,
                         ).astype(np.float32)
         except Exception as exc:
-            raise SatelliteUnavailable(f"Could not read imagery for {scene.id}: {exc}") from exc
+            log.warning("Reading %s failed: %s", item.id, exc)
+            raise SatelliteUnavailable(f"Could not download imagery for {item.id}") from exc
 
         clear = np.isin(bands["SCL"], SCL_CLEAR)
         red = (bands["B04"] - offset) / 10000.0
@@ -340,46 +312,17 @@ class PlanetaryComputerProvider:
 
 
 class SatelliteService:
-    """Chooses a provider, caches results and exposes what the web pages need."""
-
-    _probe = {"ok": None, "at": 0.0}
+    """Fetches real Sentinel-2 imagery for fields, caches it and prepares what the pages need."""
 
     def __init__(self, config, cache_dir: Path):
         self.config = config
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.demo = DemoProvider()
-        self.real = PlanetaryComputerProvider(
-            max_cloud_cover=config.get("MAX_CLOUD_COVER", 40), timeout=config.get("HTTP_TIMEOUT", 20)
+        self.provider = PlanetaryComputerProvider(
+            max_cloud_cover=config.get("MAX_CLOUD_COVER", 60),
+            timeout=config.get("HTTP_TIMEOUT", 20),
+            min_clear=config.get("MIN_CLEAR_FRACTION", 0.6),
         )
-
-    # -- provider choice -------------------------------------------------
-    def provider(self):
-        mode = self.config.get("SATELLITE_PROVIDER", "auto")
-        if mode == "demo":
-            return self.demo
-        if mode == "planetary":
-            return self.real
-        # auto: probe the real service at most every 10 minutes
-        now = time.time()
-        if self._probe["ok"] is None or now - self._probe["at"] > 600:
-            try:
-                import requests
-
-                r = requests.get(
-                    f"{PlanetaryComputerProvider.STAC_URL}/collections/{PlanetaryComputerProvider.COLLECTION}",
-                    timeout=8,
-                )
-                ok = r.ok
-                import planetary_computer  # noqa: F401
-                import pystac_client  # noqa: F401
-                import rasterio  # noqa: F401
-            except Exception:
-                ok = False
-            type(self)._probe = {"ok": ok, "at": now}
-            if not ok:
-                log.warning("Planetary Computer not reachable - using demo satellite data")
-        return self.real if self._probe["ok"] else self.demo
 
     # -- cache -----------------------------------------------------------
     def _npz_path(self, field_id, day, source):
@@ -412,17 +355,14 @@ class SatelliteService:
 
     # -- main operations --------------------------------------------------
     def update_readings(self, field, start, end, db, Reading, max_new=24):
-        """Fetch any scenes between start and end that are not cached yet. Returns provider name."""
-        provider = self.provider()
+        """Download any satellite passes between start and end not cached yet. Returns the source name.
+
+        Raises SatelliteUnavailable if the service cannot be reached; nothing is ever made up.
+        Passes that fail to download are not stored, so they are retried next time.
+        """
+        provider = self.provider
         geometry = field.geojson
-        try:
-            scenes = provider.list_scenes(geometry, start, end)
-        except SatelliteUnavailable:
-            if self.config.get("SATELLITE_PROVIDER", "auto") != "auto":
-                raise
-            type(self)._probe = {"ok": False, "at": time.time()}
-            provider = self.demo
-            scenes = provider.list_scenes(geometry, start, end)
+        scenes = provider.list_scenes(geometry, start, end)
 
         have = {
             r.date for r in Reading.query.filter_by(field_id=field.id, source=provider.name).all()
@@ -433,17 +373,13 @@ class SatelliteService:
 
         def work(scene):
             try:
-                arrays = provider.compute(
-                    geometry, scene, crop=field.crop, planting=field.planting_date,
-                    field_key=f"{field.id}-{field.geometry}",
-                )
-                return scene, arrays, None
-            except Exception as exc:  # one bad scene should not break the page
+                return scene, provider.compute(geometry, scene, crop=field.crop, planting=field.planting_date,
+                                               field_key=f"{field.id}-{field.geometry}"), None
+            except Exception as exc:  # one bad pass should not break the page
                 log.warning("Scene %s failed: %s", scene.id, exc)
                 return scene, None, exc
 
-        workers = 1 if provider is self.demo else 4
-        with ThreadPoolExecutor(max_workers=workers) as pool:
+        with ThreadPoolExecutor(max_workers=4) as pool:
             results = list(pool.map(work, todo))
 
         min_clear = self.config.get("MIN_CLEAR_FRACTION", 0.6)
@@ -465,8 +401,10 @@ class SatelliteService:
             if usable:
                 self._save_arrays(field.id, scene.date, provider.name, arrays)
         db.session.commit()
-        if failures and failures == len(results) and provider is self.real:
-            raise SatelliteUnavailable("Satellite images could not be downloaded right now.")
+        if failures and failures == len(results) and not have:
+            raise SatelliteUnavailable(
+                "Satellite images could not be downloaded right now. Please try again in a few minutes."
+            )
         return provider.name
 
     def render(self, field, day, source, index):

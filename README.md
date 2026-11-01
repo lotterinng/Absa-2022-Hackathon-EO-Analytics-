@@ -15,7 +15,7 @@ Quick start:
 ```bash
 cd webapp
 pip install -r requirements.txt
-flask --app wsgi seed-demo
+flask --app wsgi seed-sample
 python wsgi.py          # then open http://localhost:5000
 ```
 
