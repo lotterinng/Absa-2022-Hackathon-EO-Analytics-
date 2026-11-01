@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Help{% endblock %}
+{% block content %}
+<div class="card article">
+  <h2>Getting started</h2>
+  <ol>
+    <li><b>Add your field.</b> Open <a href="{{ url_for('views.fields') }}">My Fields</a>, zoom to your farm on the satellite map, choose the pentagon tool and click around the edge of the field. Give it a name, crop, planting date and the yield you normally expect.</li>
+    <li><b>My Farm</b> shows the latest cloud-free satellite picture of the field:
+      <ul><li><b>Crop Health</b> (NDVI) – red is weak growth, green/blue is strong.</li>
+      <li><b>Soil Moisture</b> (NDMI) – red is dry, blue is moist.</li>
+      <li><b>Crop Yield</b> – how close each field is to the yield you expect.</li></ul></li>
+    <li><b>Statistics</b> shows the last 3 months as charts, with rainfall and modelled soil moisture. You can download the data as a CSV file.</li>
+    <li><b>Weather</b> shows today and the next 7 days at your field, plus a simple farm tip.</li>
+    <li><b>Agric News</b> has articles from EO Analytics and agricultural news feeds.</li>
+  </ol>
+  <h2>Good to know</h2>
+  <ul>
+    <li>Images come from the European Sentinel-2 satellites, which pass about every 5 days. Clouds hide the ground, so in the rainy season there can be longer gaps.</li>
+    <li>Each pixel is 10 × 10 m, so very small plots (under about 0.1 ha) cannot be measured reliably.</li>
+    <li>The first time you open a field it can take up to a minute to download its images. After that it is fast.</li>
+    <li>Yield figures are estimates for planning, not guarantees.</li>
+  </ul>
+</div>
+{% endblock %}

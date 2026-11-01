@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, tile_art %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<section class="hero">
+  <svg class="art" viewBox="0 0 400 200" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+    <g opacity=".9">
+      <path d="M140 200 L260 110 L400 110 L400 200Z" fill="#2e9e4f"/>
+      <g stroke="#1d7a39" stroke-width="3">
+        <path d="M170 200 L270 112"/><path d="M210 200 L290 112"/><path d="M250 200 L310 112"/><path d="M290 200 L330 112"/><path d="M330 200 L350 112"/><path d="M370 200 L372 112"/>
+      </g>
+    </g>
+    <g transform="translate(300 40) rotate(-20)">
+      <rect x="-12" y="-9" width="24" height="18" rx="2" fill="#e9eef5"/>
+      <rect x="-48" y="-6" width="32" height="12" fill="#1f3c74" stroke="#9fc2ff"/>
+      <rect x="16" y="-6" width="32" height="12" fill="#1f3c74" stroke="#9fc2ff"/>
+    </g>
+    <path d="M292 56 L240 150 L330 150Z" fill="#ffffff" opacity=".18"/>
+  </svg>
+  <div class="text">
+    <h2>Dumela, {{ g.user.first_name }}</h2>
+    <p>Get the latest performance of your farm at a click of a button — straight from satellites.</p>
+  </div>
+</section>
+
+<div class="tiles">
+  <a class="tile" href="{{ url_for('views.my_farm') }}">{{ tile_art('farm') }}<span>My Farm</span><small>Today's crop health, moisture &amp; yield</small></a>
+  <a class="tile" href="{{ url_for('views.statistics') }}">{{ tile_art('chart') }}<span>Statistics</span><small>Last 3 months</small></a>
+  <a class="tile" href="{{ url_for('views.weather') }}">{{ tile_art('weather') }}<span>Weather</span><small>Now and next 7 days</small></a>
+  <a class="tile" href="{{ url_for('views.news') }}">{{ tile_art('news') }}<span>Agric News</span><small>Articles &amp; tips</small></a>
+</div>
+
+<div class="card">
+  <div class="toolbar"><h2 class="grow" style="margin:0">My fields</h2><a class="btn sm" href="{{ url_for('views.fields') }}">{{ icon('map') }} Manage fields</a></div>
+  {% if g.user.fields %}
+  <div class="field-chips">
+    {% for f in g.user.fields %}
+    <a class="field-chip" href="{{ url_for('views.my_farm', field=f.id) }}">{{ icon('pin') }}<div><b>{{ f.name }}</b><br><span class="small muted">{{ f.crop }} · {{ '%.1f'|format(f.area_ha) }} ha</span></div></a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>You haven't added a field yet. Draw your field on the satellite map so we can monitor it.</p>
+    <a class="btn green" href="{{ url_for('views.fields') }}">Add my first field</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

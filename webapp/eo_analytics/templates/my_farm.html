@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}My Farm Today{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">{% endblock %}
+{% block content %}
+<div class="toggle" role="tablist">
+  <button data-tab="health" role="tab">Crop Health</button>
+  <button data-tab="moisture" role="tab">Soil Moisture</button>
+  <button data-tab="yield" role="tab">Crop Yield</button>
+</div>
+<div id="source" class="source-note hidden"></div>
+
+<section id="index-panel">
+  <div class="toolbar">
+    <select id="field" aria-label="Field"></select>
+    <select id="date" aria-label="Image date"></select>
+    <span class="grow"></span>
+    <a class="btn ghost sm" href="{{ url_for('views.fields') }}">{{ icon('map') }} Edit fields</a>
+  </div>
+  <div class="grid" style="grid-template-columns:minmax(0,2fr) minmax(280px,1fr)" id="index-grid">
+    <div class="card">
+      <h2 id="index-heading">Monitor the health status of your crops</h2>
+      <div class="map-wrap">
+        <div id="map" class="map"></div>
+        <div id="map-date" class="map-date hidden"></div>
+        <div class="legend"><b id="legend-title">Crop Health</b><div class="ramp"></div>
+          <div class="ends"><span id="lg0">Poor Health</span><span id="lg1">Medium</span><span id="lg2">Good Health</span></div></div>
+        <div id="map-loading" class="loading hidden"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card" id="summary">
+        <h3>Field summary</h3>
+        <div class="big-num" id="mean">–</div>
+        <div class="muted small" id="mean-label">average index</div>
+        <div class="bars" id="bars"></div>
+        <div class="small muted" id="bars-label"></div>
+        <div style="margin-top:12px" id="kv"></div>
+      </div>
+      <div class="rec" style="margin-top:16px">
+        <h3>{{ icon('star') }} Recommendations:</h3>
+        <p id="rec">Loading…</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="yield-panel" class="hidden">
+  <div class="card">
+    <h2>Measure your crop yield</h2>
+    <p class="small muted">Each ring shows how close a field is to the yield you expect, based on how green the crop became this season compared with a healthy crop of the same type.</p>
+    <div class="rings"><div style="width:280px;height:280px;position:relative"><canvas id="rings"></canvas><div id="yield-loading" class="loading hidden"></div></div></div>
+    <div class="yield-cards" id="yield-cards"></div>
+  </div>
+  <div class="rec" style="margin-top:16px">
+    <h3>{{ icon('star') }} Recommendations:</h3>
+    <p id="yield-rec">Loading…</p>
+  </div>
+</section>
+<style>@media (max-width: 860px) { #index-grid { grid-template-columns: 1fr !important; } }</style>
+{% endblock %}
+{% block scripts %}
+<script>window.EO_TAB = {{ tab|tojson }};</script>
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/myfarm.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Agric News{% endblock %}
+{% block content %}
+<form class="search" method="get">
+  <input type="hidden" name="category" value="{{ category }}">
+  <input name="q" value="{{ q }}" placeholder="Search News" aria-label="Search news">
+  <button aria-label="Search">{{ icon('search') }}</button>
+</form>
+<h1 style="font-size:2rem;margin:16px 0 0">Agri-News</h1>
+<p class="muted" style="margin-top:0">Explore the Agric-Space with one click</p>
+
+{% if featured and not q %}
+<div class="carousel">
+  {% for a in featured %}
+  <a class="slide" href="{{ url_for('views.article', article_id=a.id) }}">
+    {% if a.image_url %}<img src="{{ a.image_url }}" alt="" loading="lazy">{% endif %}
+    <span>{{ a.title }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<nav class="tabs">
+  {% for c in categories %}<a href="{{ url_for('views.news', category=c, q=q or None) }}" class="{{ 'on' if c == category }}">{{ c }}</a>{% endfor %}
+</nav>
+
+{% for a in articles %}
+<a class="news-item" href="{{ url_for('views.article', article_id=a.id) }}">
+  {% if a.image_url %}<img class="thumb" src="{{ a.image_url }}" alt="" loading="lazy">{% else %}<div class="thumb"></div>{% endif %}
+  <div class="body">
+    <b>{{ a.title }}</b>
+    {% if a.summary %}<span class="small muted">{{ a.summary }}</span>{% endif %}
+    <div class="meta"><span>{{ a.read_minutes }} min read · {{ a.category }}</span><span>{{ a.created_at.strftime('%d %b %Y') }}</span></div>
+  </div>
+</a>
+{% endfor %}
+
+{% if external %}
+<h2 style="margin-top:22px">From around the world</h2>
+{% for e in external %}
+<a class="news-item" href="{{ e.link }}" target="_blank" rel="noopener">
+  {% if e.image %}<img class="thumb" src="{{ e.image }}" alt="" loading="lazy">{% else %}<div class="thumb"></div>{% endif %}
+  <div class="body">
+    <b>{{ e.title }}</b>
+    <span class="small muted">{{ e.summary }}</span>
+    <div class="meta"><span>{{ e.source }}</span><span>{{ e.date }}</span></div>
+  </div>
+</a>
+{% endfor %}
+{% endif %}
+
+{% if not articles and not external %}
+<div class="empty card">No articles {% if q %}match "{{ q }}"{% else %}in this category yet{% endif %}.</div>
+{% endif %}
+{% endblock %}

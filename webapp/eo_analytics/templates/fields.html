@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}My Fields{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet-draw/leaflet.draw.css') }}">
+{% endblock %}
+{% block content %}
+{% if request.args.get('first') %}
+<div class="flash info">Start by drawing your field on the map. Zoom in to your farm, click the <b>pentagon</b> button on the left of the map, then click each corner of the field and click the first corner again to finish.</div>
+{% endif %}
+<div class="grid" style="grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr)" id="layout">
+  <div class="card">
+    <div class="toolbar">
+      <form id="search" class="search grow" style="min-width:200px">
+        <input name="q" placeholder="Find a village or place, e.g. Bokaa" aria-label="Find a place">
+        <button aria-label="Search">{{ icon('search') }}</button>
+      </form>
+      <button class="btn ghost sm" id="locate" type="button">{{ icon('pin') }} My location</button>
+    </div>
+    <div class="map-wrap"><div id="map" class="map tall"></div></div>
+    <p class="small muted" style="margin:8px 0 0">Tip: use the pentagon tool to draw a new field. Click a field to edit its shape or details.</p>
+  </div>
+
+  <div>
+    <div class="card hidden" id="form-card">
+      <h2 id="form-title">New field</h2>
+      <form id="field-form">
+        <label for="f-name">Field name</label>
+        <input id="f-name" required placeholder="e.g. North maize block">
+        <label for="f-crop">Crop</label>
+        <select id="f-crop">{% for c in crops %}<option>{{ c }}</option>{% endfor %}</select>
+        <div class="grid grid-2" style="gap:10px">
+          <div><label for="f-yield">Expected yield (t/ha)</label><input id="f-yield" type="number" step="0.1" min="0" placeholder="optional"></div>
+          <div><label for="f-plant">Planting date</label><input id="f-plant" type="date"></div>
+        </div>
+        <p class="small muted">Area: <b id="f-area">–</b> ha. Drag the white squares on the map to adjust the shape.</p>
+        <div id="form-error" class="flash error hidden"></div>
+        <div class="toolbar" style="margin:12px 0 0">
+          <button class="btn green" id="save">Save field</button>
+          <button class="btn ghost" type="button" id="cancel">Cancel</button>
+          <span class="grow"></span>
+          <button class="btn danger sm hidden" type="button" id="delete">Delete</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card field-list">
+      <h2>My fields</h2>
+      <div id="list"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+<style>@media (max-width: 860px) { #layout { grid-template-columns: 1fr !important; } }</style>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/leaflet-draw/leaflet.draw.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fields.js') }}"></script>
+{% endblock %}

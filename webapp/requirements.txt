@@ -1,0 +1,13 @@
+# Web app
+Flask>=3.0,<4
+Flask-SQLAlchemy>=3.1,<4
+requests>=2.31
+numpy>=1.26
+Pillow>=10.0
+gunicorn>=22.0
+
+# Real Sentinel-2 satellite imagery (Microsoft Planetary Computer).
+# Without these the app still runs, using demo imagery.
+rasterio>=1.3
+pystac-client>=0.7
+planetary-computer>=1.0

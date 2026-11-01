@@ -1,0 +1,8 @@
+<div class="table-wrap"><table>
+  <thead><tr><th>When (UTC)</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+  <tbody>
+  {% for a in (recent if recent is defined else rows) %}
+  <tr><td>{{ a.created_at.strftime('%d %b %H:%M') }}</td><td>{{ a.user.email if a.user else '–' }}</td><td>{{ a.action }}</td><td class="muted">{{ a.detail or '' }}</td></tr>
+  {% else %}<tr><td colspan="4" class="empty">No activity yet.</td></tr>{% endfor %}
+  </tbody>
+</table></div>

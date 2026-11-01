@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Manage Agric News{% endblock %}
+{% block content %}
+{% include "admin/_tabs.html" %}
+<div class="card">
+  <div class="toolbar"><h2 class="grow" style="margin:0">Articles</h2><a class="btn sm green" href="{{ url_for('admin.news_edit') }}">+ New article</a></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Title</th><th>Category</th><th>Date</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for a in articles %}
+    <tr>
+      <td><a href="{{ url_for('views.article', article_id=a.id) }}">{{ a.title }}</a></td>
+      <td>{{ a.category }}</td><td>{{ a.created_at.strftime('%d %b %Y') }}</td>
+      <td>{% if a.published %}<span class="badge green">published</span>{% else %}<span class="badge amber">draft</span>{% endif %}</td>
+      <td style="white-space:nowrap"><a class="btn ghost sm" href="{{ url_for('admin.news_edit', article_id=a.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('admin.news_delete', article_id=a.id) }}" onsubmit="return confirm('Delete this article?')"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn danger sm">Delete</button></form></td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="empty">No articles yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

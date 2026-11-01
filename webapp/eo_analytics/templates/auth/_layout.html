@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block auth %}
+<div class="auth"><div class="auth-box">
+  <div class="logo-block">
+    <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="EO Analytics logo">
+    <h1>EO ANALYTICS</h1><p>Space-Tech Farming</p>
+  </div>
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+  {% block form %}{% endblock %}
+</div></div>
+{% endblock %}

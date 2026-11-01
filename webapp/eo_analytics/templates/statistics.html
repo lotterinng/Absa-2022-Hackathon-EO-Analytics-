@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}My Statistics{% endblock %}
+{% block content %}
+<div class="toggle" role="tablist">
+  <button data-tab="health" role="tab">Crop Health</button>
+  <button data-tab="moisture" role="tab">Soil Moisture</button>
+  <button data-tab="yield" role="tab">Crop Yield</button>
+</div>
+<div id="source" class="source-note hidden"></div>
+<div class="toolbar">
+  <select id="field" aria-label="Field"></select>
+  <span class="grow"></span>
+  <button class="btn ghost sm" id="csv" type="button">Download CSV</button>
+</div>
+
+<div class="grid" style="grid-template-columns:minmax(0,2fr) minmax(280px,1fr)" id="stats-grid">
+  <div class="card">
+    <h2 id="heading">Past 3 months health status of your crops</h2>
+    <div style="position:relative;height:300px"><canvas id="trend"></canvas><div id="loading" class="loading hidden"></div></div>
+    <h3 style="margin-top:18px" id="monthly-title">Monthly average</h3>
+    <div style="position:relative;height:200px"><canvas id="monthly"></canvas></div>
+  </div>
+  <div>
+    <div class="rec">
+      <h3>{{ icon('bookmark') }} Analysis:</h3>
+      <ul id="analysis"><li>Loading…</li></ul>
+    </div>
+    <div class="card" id="explain" style="margin-top:16px">
+      <h3>What am I looking at?</h3>
+      <p class="small muted" id="explain-text"></p>
+    </div>
+  </div>
+</div>
+<style>@media (max-width: 860px) { #stats-grid { grid-template-columns: 1fr !important; } }</style>
+{% endblock %}
+{% block scripts %}
+<script>window.EO_TAB = {{ tab|tojson }};</script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/statistics.js') }}"></script>
+{% endblock %}

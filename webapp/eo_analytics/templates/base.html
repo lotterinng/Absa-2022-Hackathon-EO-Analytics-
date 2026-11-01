@@ -1,0 +1,64 @@
+{% from "_icons.html" import icon %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}EO Analytics{% endblock %} · EO Analytics</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/logo.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+{% if g.user %}
+{% set ep = request.endpoint or '' %}
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="{{ url_for('views.home') }}">
+      <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="">
+      <div><b>EO ANALYTICS</b><span>Space-Tech Farming</span></div>
+    </a>
+    <nav class="nav">
+      <a href="{{ url_for('views.home') }}" class="{{ 'active' if ep == 'views.home' }}">{{ icon('home') }} Home</a>
+      <a href="{{ url_for('views.my_farm') }}" class="{{ 'active' if ep == 'views.my_farm' }}">{{ icon('farm') }} My Farm</a>
+      <a href="{{ url_for('views.statistics') }}" class="{{ 'active' if ep == 'views.statistics' }}">{{ icon('chart') }} Statistics</a>
+      <a href="{{ url_for('views.weather') }}" class="{{ 'active' if ep == 'views.weather' }}">{{ icon('weather') }} Weather</a>
+      <a href="{{ url_for('views.news') }}" class="{{ 'active' if ep in ('views.news', 'views.article') }}">{{ icon('news') }} Agric News</a>
+      <div class="sep"></div>
+      <a href="{{ url_for('views.fields') }}" class="{{ 'active' if ep == 'views.fields' }}">{{ icon('map') }} My Fields</a>
+      <a href="{{ url_for('auth.account') }}" class="{{ 'active' if ep == 'auth.account' }}">{{ icon('user') }} Account</a>
+      <a href="{{ url_for('views.help_page') }}" class="{{ 'active' if ep == 'views.help_page' }}">{{ icon('help') }} Help</a>
+      {% if g.user.is_admin %}
+      <a href="{{ url_for('admin.dashboard') }}" class="{{ 'active' if ep.startswith('admin.') }}">{{ icon('shield') }} Admin</a>
+      {% endif %}
+    </nav>
+    <div class="user">
+      Signed in as <b>{{ g.user.first_name }}</b><br>
+      <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="linkbtn">Sign out</button></form>
+    </div>
+  </aside>
+  <div>
+    <header class="topbar">
+      {% if ep != 'views.home' %}<a class="back" href="{{ url_for('views.home') }}" aria-label="Home">{{ icon('back') }}</a>{% endif %}
+      <h1>{% block heading %}{{ self.title() }}{% endblock %}</h1>
+    </header>
+    <main>
+      {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <nav class="bottomnav">
+    <a href="{{ url_for('views.home') }}" class="{{ 'active' if ep == 'views.home' }}">{{ icon('home') }}Home</a>
+    <a href="{{ url_for('views.my_farm') }}" class="{{ 'active' if ep in ('views.my_farm', 'views.fields') }}">{{ icon('farm') }}My Farm</a>
+    <a href="{{ url_for('views.statistics') }}" class="{{ 'active' if ep == 'views.statistics' }}">{{ icon('chart') }}Statistics</a>
+    <a href="{{ url_for('views.weather') }}" class="{{ 'active' if ep == 'views.weather' }}">{{ icon('weather') }}Weather</a>
+    <a href="{{ url_for('views.news') }}" class="{{ 'active' if ep in ('views.news', 'views.article') }}">{{ icon('news') }}News</a>
+  </nav>
+</div>
+{% else %}
+  {% block auth %}{% endblock %}
+{% endif %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

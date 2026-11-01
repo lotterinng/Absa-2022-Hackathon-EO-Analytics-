@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Account{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px">
+  <h2>Your details</h2>
+  <p class="muted small">Member since {{ g.user.created_at.strftime('%d %B %Y') }}</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label>Full name</label><input name="full_name" value="{{ g.user.full_name }}" required>
+    <label>Email</label><input value="{{ g.user.email }}" disabled>
+    <label>Phone</label><input name="phone" value="{{ g.user.phone or '' }}">
+    <label>New password <span class="muted">(leave blank to keep)</span></label><input type="password" name="password" minlength="8">
+    <label>Confirm new password</label><input type="password" name="confirm" minlength="8">
+    <label>Current password <span class="muted">(required to save)</span></label><input type="password" name="current" required>
+    <p><button class="btn">Save changes</button></p>
+  </form>
+</div>
+{% endblock %}

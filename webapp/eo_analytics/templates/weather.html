@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Weather{% endblock %}
+{% block content %}
+<div class="toolbar">
+  {% if g.user.fields %}<select id="field" aria-label="Field"></select>{% endif %}
+</div>
+<div id="source" class="source-note hidden"></div>
+<div class="grid grid-2">
+  <div>
+    <h1 id="place" style="font-size:2rem;margin:0">{{ icon('pin') }}</h1>
+    <p class="muted" id="desc">Loading…</p>
+    <div class="wx-hero">
+      <div><div class="temp" id="temp">–°</div><div id="desc2" style="font-size:1.1rem;margin-top:6px"></div><div class="small" id="range"></div></div>
+      <div id="wx-icon"></div>
+    </div>
+  </div>
+  <div>
+    <div class="wx-stats">
+      <div><span class="muted small">Wind speed</span><div class="ic">{{ icon('weather') }}</div><b id="wind">–</b></div>
+      <div><span class="muted small">Humidity</span><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#3b7ddd" stroke-width="2"><path d="M12 3s6 7 6 11a6 6 0 01-12 0c0-4 6-11 6-11z"/></svg></div><b id="hum">–</b></div>
+      <div><span class="muted small">Rain today</span><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#3b7ddd" stroke-width="2"><path d="M7 15a4 4 0 010-8 6 6 0 0111 2 3 3 0 010 6z"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg></div><b id="rain">–</b></div>
+      <div><span class="muted small">Water use (ET₀)</span><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#3b7ddd" stroke-width="2"><circle cx="12" cy="10" r="4"/><path d="M12 2v2M12 16v2M4 10H2M22 10h-2M8 22h8"/></svg></div><b id="et0">–</b></div>
+    </div>
+    <div class="rec"><h3>{{ icon('star') }} Farm tip:</h3><p id="tip">Loading…</p></div>
+  </div>
+</div>
+<div class="toolbar" style="margin-top:22px"><h2 class="grow" style="margin:0">Today &amp; next 7 days</h2></div>
+<div class="days" id="days"></div>
+<div class="card" style="margin-top:16px">
+  <h3>Rainfall – last 3 months</h3>
+  <div style="position:relative;height:220px"><canvas id="rainchart"></canvas></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/weather.js') }}"></script>
+{% endblock %}
